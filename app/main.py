@@ -6,7 +6,7 @@ from app import models, schemas, crud, auth
 from app.database import engine, SessionLocal
 from app.config import settings
 
-
+# test
 # Veritabanındaki tabloları oluştur
 models.Base.metadata.create_all(bind=engine)
 
