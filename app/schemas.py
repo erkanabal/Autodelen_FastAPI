@@ -1,40 +1,38 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+# schemas.py
+from pydantic import BaseModel
+from typing import List, Optional
 
-# Kullanıcıdan kayıt olurken istenecek alanlar
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     username: str
-    email: EmailStr
+    email: str
+
+class UserCreate(UserBase):
     password: str
 
-# Kullanıcıya geri dönecek alanlar (şifre yok!)
-class UserOut(BaseModel):
+class UserOut(UserBase):
     id: int
-    username: str
-    email: EmailStr
 
     class Config:
-        from_attributes = True
-        
+        orm_mode = True
 
-# Giriş yapan kullanıcıya dönecek JWT token bilgisi
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-# Araç oluşturma
-class VehicleCreate(BaseModel):
+class VehicleBase(BaseModel):
     brand: str
     model: str
     license_plate: str
     seats: int
     luggage: int
-    available: Optional[bool] = True
+    available: bool
 
-# Araç yanıt
-class VehicleOut(VehicleCreate):
+class VehicleCreate(VehicleBase):
+    pass
+
+class VehicleOut(VehicleBase):
     id: int
     owner_id: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
