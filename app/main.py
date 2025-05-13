@@ -78,7 +78,7 @@ def update_vehicle(
         raise HTTPException(status_code=403, detail="Not authorized to update this vehicle or vehicle not found")
     return updated_vehicle
 
-# Delete vehicle (only the owner can delete)
+# Delete vehicle (only the owner can delete).
 @app.delete("/vehicles/{vehicle_id}")
 def delete_vehicle(
     vehicle_id: int,
@@ -89,3 +89,6 @@ def delete_vehicle(
     if not vehicle:
         raise HTTPException(status_code=403, detail="Not authorized to delete this vehicle or vehicle not found")
     return {"detail": "Vehicle deleted successfully"}
+ 
+
+ 
