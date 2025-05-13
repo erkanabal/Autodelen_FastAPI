@@ -26,8 +26,8 @@ class Vehicle(Base):
 
     owner = relationship("User", back_populates="vehicles")
     
-class Verhuur(Base):
-    __tablename__ = "verhuur"
+class Rental(Base):
+    __tablename__ = "rentals"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))

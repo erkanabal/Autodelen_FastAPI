@@ -18,7 +18,8 @@ ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# auth.py
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/token")
 
 def get_password_hash(password: str):
     return pwd_context.hash(password)

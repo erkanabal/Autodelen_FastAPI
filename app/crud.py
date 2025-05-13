@@ -60,12 +60,12 @@ def delete_vehicle(db: Session, vehicle_id: int, user_id: int):
         return vehicle
     return None
 
-def create_verhuur(db: Session, verhuur: schemas.VerhuurCreate, user_id: int):
-    db_verhuur = models.Verhuur(**verhuur.dict(), user_id=user_id)
-    db.add(db_verhuur)
+def create_rental(db: Session, rental: schemas.RentalCreate, user_id: int):
+    db_rental = models.Rental(**rental.dict(), user_id=user_id)
+    db.add(db_rental)
     db.commit()
-    db.refresh(db_verhuur)
-    return db_verhuur
+    db.refresh(db_rental)
+    return db_rental
 
-def get_user_verhuur(db: Session, user_id: int):
-    return db.query(models.Verhuur).filter(models.Verhuur.user_id == user_id).all()
+def get_user_rentals(db: Session, user_id: int):
+    return db.query(models.Rental).filter(models.Rental.user_id == user_id).all()
