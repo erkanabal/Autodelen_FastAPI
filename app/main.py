@@ -45,7 +45,7 @@ def create_vehicle(
 ):
     return crud.create_vehicle(db=db, vehicle=vehicle, user_id=current_user.id)
 
-# Get all vehicles (only current user's vehicles)
+# Get all vehicles (only current user's vehicles).
 @app.get("/vehicles", response_model=list[schemas.VehicleOut])
 def read_vehicles(
     db: Session = Depends(get_db),
