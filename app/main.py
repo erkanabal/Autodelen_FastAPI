@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from app import models, schemas, crud, auth
-from app.database import engine, SessionLocal
+from app.database import engine, SessionLocal, get_db
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -11,13 +11,6 @@ app = FastAPI()
 @app.get("/")
 def read_root():
     return {"message": "API is running!"}
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @app.post("/register", response_model=schemas.UserOut)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
