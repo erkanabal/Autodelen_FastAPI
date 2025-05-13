@@ -65,7 +65,7 @@ def read_vehicle(
         raise HTTPException(status_code=403, detail="Not authorized to access this vehicle")
     return vehicle
 
-# Update vehicle (only the owner can update)
+# Update vehicle (only the owner can update).
 @app.put("/vehicles/{vehicle_id}", response_model=schemas.VehicleOut)
 def update_vehicle(
     vehicle_id: int,
