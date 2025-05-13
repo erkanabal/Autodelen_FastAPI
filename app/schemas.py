@@ -1,6 +1,23 @@
 # schemas.py
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
+
+class VerhuurBase(BaseModel):
+    vehicle_id: int
+    start_date: datetime
+    end_date: datetime
+    total_price: int
+
+class VerhuurCreate(VerhuurBase):
+    pass
+
+class VerhuurOut(VerhuurBase):
+    id: int
+    user_id: int
+
+    class Config:
+        orm_mode = True
 
 class UserBase(BaseModel):
     username: str

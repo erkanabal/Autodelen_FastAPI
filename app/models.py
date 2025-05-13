@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
+from datetime import datetime
 
 class User(Base):
     __tablename__ = "users"  
@@ -25,3 +26,15 @@ class Vehicle(Base):
 
     owner = relationship("User", back_populates="vehicles")
     
+class Verhuur(Base):
+    __tablename__ = "verhuur"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
+    start_date = Column(DateTime, default=datetime.utcnow)
+    end_date = Column(DateTime)
+    total_price = Column(Integer)
+
+    user = relationship("User")
+    vehicle = relationship("Vehicle")

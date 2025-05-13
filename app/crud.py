@@ -59,3 +59,13 @@ def delete_vehicle(db: Session, vehicle_id: int, user_id: int):
         db.commit()
         return vehicle
     return None
+
+def create_verhuur(db: Session, verhuur: schemas.VerhuurCreate, user_id: int):
+    db_verhuur = models.Verhuur(**verhuur.dict(), user_id=user_id)
+    db.add(db_verhuur)
+    db.commit()
+    db.refresh(db_verhuur)
+    return db_verhuur
+
+def get_user_verhuur(db: Session, user_id: int):
+    return db.query(models.Verhuur).filter(models.Verhuur.user_id == user_id).all()

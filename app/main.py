@@ -26,6 +26,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud.create_user(db, user)
 
+
 @app.post("/token", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = crud.get_user_by_username(db, form_data.username)
@@ -89,3 +90,18 @@ def delete_vehicle(
     if not vehicle:
         raise HTTPException(status_code=403, detail="Not authorized to delete this vehicle or vehicle not found")
     return {"detail": "Vehicle deleted successfully"}
+
+@app.post("/verhuur", response_model=schemas.VerhuurOut)
+def create_verhuur(
+    verhuur: schemas.VerhuurCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    return crud.create_verhuur(db=db, verhuur=verhuur, user_id=current_user.id)
+
+@app.get("/verhuur", response_model=list[schemas.VerhuurOut])
+def read_user_verhuur(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    return crud.get_user_verhuur(db=db, user_id=current_user.id)
