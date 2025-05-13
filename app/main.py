@@ -37,6 +37,34 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     access_token = auth.create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
+#nieuwe code van mij
+@app.get("/me", response_model=schemas.UserOut)
+def read_current_user(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user
+
+#nieuwe code2 van mij
+@app.put("/me", response_model=schemas.UserOut)
+def update_current_user(
+    updated_user: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    user = crud.update_user(db=db, user_id=current_user.id, updated_data=updated_user)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+#nieuwe code2 van mij
+@app.delete("/me")
+def delete_current_user(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    deleted = crud.delete_user(db=db, user_id=current_user.id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"detail": "User deleted successfully"}
+
 @app.post("/vehicles", response_model=schemas.VehicleOut)
 def create_vehicle(
     vehicle: schemas.VehicleCreate,

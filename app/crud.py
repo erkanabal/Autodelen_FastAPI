@@ -59,3 +59,27 @@ def delete_vehicle(db: Session, vehicle_id: int, user_id: int):
         db.commit()
         return vehicle
     return None
+
+#nieuwe code van mij
+def update_user(db: Session, user_id: int, updated_data: schemas.UserUpdate):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        if updated_data.username:
+            user.username = updated_data.username
+        if updated_data.email:
+            user.email = updated_data.email
+        if updated_data.password:
+            user.hashed_password = get_password_hash(updated_data.password)
+        db.commit()
+        db.refresh(user)
+        return user
+    return None
+
+def delete_user(db: Session, user_id: int):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        db.delete(user)
+        db.commit()
+        return user
+    return None
+
