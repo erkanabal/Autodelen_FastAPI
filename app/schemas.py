@@ -1,6 +1,5 @@
 # schemas.py
 from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
 
 class RentalBase(BaseModel):
@@ -9,8 +8,12 @@ class RentalBase(BaseModel):
     end_date: datetime
     total_price: int
 
-class RentalCreate(RentalBase):
-    pass
+class RentalCreate(BaseModel):
+    vehicle_id: int
+    start_date: datetime
+    end_date: datetime
+    total_price: int
+
 
 class RentalOut(RentalBase):
     id: int
@@ -25,7 +28,14 @@ class UserBase(BaseModel):
     email: str
 
 class UserCreate(UserBase):
+
     password: str
+
+class UserUpdate(BaseModel):
+    username: str
+    email: str
+    password: str
+
 
 class UserOut(UserBase):
     id: int

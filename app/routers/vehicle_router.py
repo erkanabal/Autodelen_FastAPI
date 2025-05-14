@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app import crud, schemas, auth, models
 from app.database import get_db
 
-router = APIRouter(prefix="/vehicle", tags=["Vehicle"])
+router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
 @router.post("/", response_model=schemas.VehicleOut)
 def create_vehicle(vehicle: schemas.VehicleCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):

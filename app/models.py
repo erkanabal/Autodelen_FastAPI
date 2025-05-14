@@ -11,6 +11,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
 
     vehicles = relationship("Vehicle", back_populates="owner")
+    rentals = relationship("Rental", back_populates="user")
+
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
@@ -25,16 +27,25 @@ class Vehicle(Base):
     available = Column(Boolean, default=True)
 
     owner = relationship("User", back_populates="vehicles")
+    rentals = relationship("Rental", back_populates="vehicle")
+
     
+from sqlalchemy import CheckConstraint
+
 class Rental(Base):
     __tablename__ = "rentals"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
-    start_date = Column(DateTime, default=datetime.utcnow)
-    end_date = Column(DateTime)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
     total_price = Column(Integer)
 
-    user = relationship("User")
-    vehicle = relationship("Vehicle")
+    user = relationship("User", back_populates="rentals")
+    vehicle = relationship("Vehicle", back_populates="rentals")
+
+
+    __table_args__ = (
+        CheckConstraint('end_date > start_date', name='check_rental_dates'),
+    )
