@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Check Available Vehicles</title>
+</head>
+<body>
+  <h2>Check Available Vehicles</h2>
+
+  <label for="start_date">Start Date and Time:</label>
+  <input type="datetime-local" id="start_date">
+
+  <br>
+
+  <label for="end_date">End Date and Time:</label>
+  <input type="datetime-local" id="end_date">
+
+  <br><br>
+
+  <button onclick="checkAvailability()">Check Availability</button>
+
+  <pre id="result"></pre>
+
+  <!-- ✅ JavaScript burada -->
+  <script>
+    function checkAvailability() {
+      const startInput = document.getElementById("start_date").value;
+      const endInput = document.getElementById("end_date").value;
+
+      if (!startInput || !endInput) {
+        alert("Please enter both start and end date/time.");
+        return;
+      }
+
+      const formattedStart = startInput;  // ISO formatı bozmadan gönder
+      const formattedEnd = endInput;
+
+      fetch(`/rentals/available?start_date=${encodeURIComponent(formattedStart)}&end_date=${encodeURIComponent(formattedEnd)}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Server error");
+          return res.json();
+        })
+        .then(data => {
+          document.getElementById("result").textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(err => {
+          document.getElementById("result").textContent = "Error: " + err.message;
+        });
+    }
+  </script>
+</body>
+</html>
