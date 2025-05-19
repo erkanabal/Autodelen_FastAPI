@@ -9,6 +9,8 @@ import os
 from dotenv import load_dotenv  # Import dotenv to load environment variables
 from app import crud
 from app.database import get_db
+
+
 # Load environment variables from the .env file
 load_dotenv()
 

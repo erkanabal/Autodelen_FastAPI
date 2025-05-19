@@ -14,13 +14,19 @@ class RentalCreate(BaseModel):
     end_date: datetime
     total_price: int
 
-
-class RentalOut(RentalBase):
+class RentalOut(BaseModel):
+    vehicle_id: int
+    start_date: datetime
+    end_date: datetime
+    total_price: int
     id: int
     user_id: int
 
     class Config:
         from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.strftime("%Y-%m-%d %H:%M")
+        }
         
         
 class UserBase(BaseModel):

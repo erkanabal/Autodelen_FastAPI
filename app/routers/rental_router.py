@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app import crud, schemas, models, auth
 from app.database import get_db
-from app.utils.datetime_utils import parse_datetime_param  # DateTime parsing utility
+from datetime import datetime
+
 
 router = APIRouter(prefix="/rentals", tags=["Rentals"])
 
@@ -57,16 +58,21 @@ def delete_rental_endpoint(
     return crud.delete_rental(db=db, rental_id=rental_id, user_id=current_user.id)
 
 
-@router.get("/available", response_model=list[schemas.VehicleOut])
+from fastapi import Query
+from datetime import datetime
+
+@router.get("/available")
 def get_available_vehicles(
-    start_date: str = Query(...),
-    end_date: str = Query(...),
+    start_date: str = Query(..., example="2025-05-19 10:00", description="Format: YYYY-MM-DD HH:MM"),
+    end_date: str = Query(..., example="2025-05-20 10:00", description="Format: YYYY-MM-DD HH:MM"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Parse the start_date and end_date with the utility function
-    start_dt = parse_datetime_param(start_date)
-    end_dt = parse_datetime_param(end_date)
+    try:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Tarih formatı hatalı. Beklenen: YYYY-MM-DD HH:MM")
 
     return crud.get_available_vehicles(db=db, start_date=start_dt, end_date=end_dt)
 
