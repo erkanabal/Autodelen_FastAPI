@@ -3,43 +3,75 @@ from app import models, schemas
 from fastapi import HTTPException, status
 from app.auth import get_password_hash
 from sqlalchemy import and_, or_
+from app.models import UserRoleEnum
 import datetime
+
+# ----------------------- USER -----------------------
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
+
+def get_user_by_username(db: Session, username: str):
+    return db.query(models.User).filter(models.User.username == username).first()
+
+def get_all_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.User).offset(skip).limit(limit).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
     db_user = models.User(
         username=user.username,
         email=user.email,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        role=user.role  # role opsiyonel, admin vs için
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
 
-def get_user_by_username(db: Session, username: str):
-    return db.query(models.User).filter(models.User.username == username).first()
+def update_user(db: Session, user_id: int, updated_user: schemas.UserUpdate):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        user.username = updated_user.username
+        user.email = updated_user.email
+        if updated_user.password:
+            user.hashed_password = get_password_hash(updated_user.password)
+        db.commit()
+        db.refresh(user)
+        return user
+    return None
 
-# Create a new vehicle and associate it with the logged-in user
+def delete_user(db: Session, user_id: int):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user:
+        db.delete(user)
+        db.commit()
+        return user
+    return None
+
+# ----------------------- VEHICLES (OWNER) -----------------------
+
 def create_vehicle(db: Session, vehicle: schemas.VehicleCreate, user_id: int):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user.role != UserRoleEnum.owner:
+        raise HTTPException(status_code=403, detail="Only owners can create vehicles")
+
     db_vehicle = models.Vehicle(**vehicle.dict(), owner_id=user_id)
     db.add(db_vehicle)
     db.commit()
     db.refresh(db_vehicle)
     return db_vehicle
 
-# Get all vehicles for the current user
-def get_user_vehicles(db: Session, user_id: int):
-    return db.query(models.Vehicle).filter(models.Vehicle.owner_id == user_id).all()
+def get_all_vehicles(db: Session):
+    return db.query(models.Vehicle).all()
 
-# Get a single vehicle by ID
+def get_all_available_vehicles(db: Session):
+    return db.query(models.Vehicle).filter(models.Vehicle.available == True).all()
+
 def get_vehicle(db: Session, vehicle_id: int):
     return db.query(models.Vehicle).filter(models.Vehicle.id == vehicle_id).first()
 
-# Update vehicle by ID (only if the current user owns the vehicle)
 def update_vehicle(db: Session, vehicle_id: int, updated_vehicle: schemas.VehicleCreate, user_id: int):
     vehicle = db.query(models.Vehicle).filter(models.Vehicle.id == vehicle_id).first()
     if vehicle and vehicle.owner_id == user_id:
@@ -54,7 +86,6 @@ def update_vehicle(db: Session, vehicle_id: int, updated_vehicle: schemas.Vehicl
         return vehicle
     return None
 
-# Delete a vehicle by ID (only if the current user owns the vehicle)
 def delete_vehicle(db: Session, vehicle_id: int, user_id: int):
     vehicle = db.query(models.Vehicle).filter(models.Vehicle.id == vehicle_id).first()
     if vehicle and vehicle.owner_id == user_id:
@@ -63,17 +94,60 @@ def delete_vehicle(db: Session, vehicle_id: int, user_id: int):
         return vehicle
     return None
 
+# ----------------------- RENTAL (RENTER) -----------------------
+
 def create_rental(db: Session, rental: schemas.RentalCreate, user_id: int):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user.role != UserRoleEnum.renter:
+        raise HTTPException(status_code=403, detail="Only renters can rent vehicles")
+
     db_rental = models.Rental(**rental.dict(), user_id=user_id)
     db.add(db_rental)
     db.commit()
     db.refresh(db_rental)
     return db_rental
 
-def get_user_rentals(db: Session, user_id: int):
-    return db.query(models.Rental).filter(models.Rental.user_id == user_id).all()
+def get_all_rentals(db: Session, user_id: int | None = None):
+    query = db.query(models.Rental)
+    if user_id:
+        query = query.filter(models.Rental.user_id == user_id)
+    return query.all()
 
-def is_vehicle_available(db: Session, vehicle_id: int, start_date: datetime, end_date: datetime) -> bool:
+
+def update_rental(db: Session, rental_id: int, updated_rental: schemas.RentalCreate, user_id: int):
+    rental = db.query(models.Rental).filter(models.Rental.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental not found")
+    if rental.user_id != user_id:
+        raise HTTPException(status_code=403, detail="You can only update your own rentals")
+
+    is_available = is_vehicle_available(
+        db=db,
+        vehicle_id=rental.vehicle_id,
+        start_date=updated_rental.start_date,
+        end_date=updated_rental.end_date
+    )
+    if not is_available:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vehicle not available during selected period")
+
+    rental.start_date = updated_rental.start_date
+    rental.end_date = updated_rental.end_date
+    db.commit()
+    db.refresh(rental)
+    return rental
+
+def delete_rental(db: Session, rental_id: int, user_id: int):
+    rental = db.query(models.Rental).filter(models.Rental.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental not found")
+    if rental.user_id != user_id:
+        raise HTTPException(status_code=403, detail="You can only delete your own rentals")
+
+    db.delete(rental)
+    db.commit()
+    return {"message": "Rental deleted successfully"}
+
+def is_vehicle_available(db: Session, vehicle_id: int, start_date: datetime.datetime, end_date: datetime.datetime) -> bool:
     overlapping_rentals = db.query(models.Rental).filter(
         models.Rental.vehicle_id == vehicle_id,
         or_(
@@ -84,91 +158,63 @@ def is_vehicle_available(db: Session, vehicle_id: int, start_date: datetime, end
     ).first()
     return overlapping_rentals is None
 
-def get_available_vehicles(db: Session, start_date: datetime, end_date: datetime):
-    conflicting_vehicle_ids = db.query(models.Rental.vehicle_id).filter(
-        or_(
-            and_(models.Rental.start_date <= start_date, models.Rental.end_date > start_date),
-            and_(models.Rental.start_date < end_date, models.Rental.end_date >= end_date),
-            and_(models.Rental.start_date >= start_date, models.Rental.end_date <= end_date)
-        )
-    ).all()
+# ----------------------- RIDE (RENTER) -----------------------
 
-    print("Conflicting vehicle IDs (vehicles with rentals during the requested period):")
-    for vehicle_id in conflicting_vehicle_ids:
-        print(vehicle_id)
-
-    available_vehicles = db.query(models.Vehicle).filter(
-        models.Vehicle.id.notin_([vehicle_id[0] for vehicle_id in conflicting_vehicle_ids])
-    ).all()
-
-    print(f"Available vehicles count: {len(available_vehicles)}")
-    return available_vehicles
-
-def update_rental(db: Session, rental_id: int, updated_rental: schemas.RentalCreate, user_id: int):
-    rental = db.query(models.Rental).filter(models.Rental.id == rental_id).first()
-    if not rental:
-        raise HTTPException(status_code=404, detail="Rental not found")
-    
-    # Kiralama kullanıcının kendi kaydı mı?
-    if rental.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You can only update your own rentals")
-    
-    # Kiralama tarihlerini kontrol et (Başka bir kiralama ile çakışmasın)
-    is_available = is_vehicle_available(
-        db=db,
-        vehicle_id=rental.vehicle_id,
-        start_date=updated_rental.start_date,
-        end_date=updated_rental.end_date
+def create_ride(db: Session, ride: schemas.RideCreate, user_id: int):
+    db_ride = models.Ride(
+        rental_id=ride.rental_id,
+        start_date=ride.start_date,
+        end_date=ride.end_date,
+        start_location=ride.start_location,
+        end_location=ride.end_location,
+        available_seats=ride.available_seats,
+        renter_id=user_id  
     )
-    
-    if not is_available:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="The vehicle is already rented during the selected period."
+    db.add(db_ride)
+    db.commit()
+    db.refresh(db_ride)
+    return db_ride
+
+def get_all_rides(db: Session):
+    return db.query(models.Ride).all()
+
+def get_available_rides(db: Session):
+    return db.query(models.Ride).filter(models.Ride.available_seats > 0).all()
+
+# ----------------------- RIDE PARTICIPANT (PASSENGER) -----------------------
+
+def join_ride(db: Session, ride_id: int, user_id: int):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user.role != UserRoleEnum.passenger:
+        raise HTTPException(status_code=403, detail="Only passengers can join rides")
+
+    ride = db.query(models.Ride).filter(models.Ride.id == ride_id).first()
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found")
+
+    if ride.available_seats <= 0:
+        raise HTTPException(status_code=400, detail="No available seats in this ride")
+
+    if check_passenger_time_conflict(db, user_id, ride.start_date, ride.end_date):
+        raise HTTPException(status_code=409, detail="You have already joined another ride during this time")
+
+    db_participant = models.RideParticipant(ride_id=ride_id, user_id=user_id)
+    db.add(db_participant)
+
+    ride.available_seats -= 1
+    db.commit()
+    return {"message": "Successfully joined the ride"}
+
+def check_passenger_time_conflict(db: Session, user_id: int, start_date, end_date):
+    conflict = db.query(models.RideParticipant).join(models.Ride).filter(
+        models.RideParticipant.user_id == user_id,
+        or_(
+            and_(models.Ride.start_date <= start_date, models.Ride.end_date > start_date),
+            and_(models.Ride.start_date < end_date, models.Ride.end_date >= end_date),
+            and_(models.Ride.start_date >= start_date, models.Ride.end_date <= end_date)
         )
-    
-    # Kiralama bilgilerini güncelle
-    rental.start_date = updated_rental.start_date
-    rental.end_date = updated_rental.end_date
-    db.commit()
-    db.refresh(rental)
-    
-    return rental
+    ).first()
+    return conflict is not None
 
-def delete_rental(db: Session, rental_id: int, user_id: int):
-    rental = db.query(models.Rental).filter(models.Rental.id == rental_id).first()
-    if not rental:
-        raise HTTPException(status_code=404, detail="Rental not found")
-    
-    # Kiralama kullanıcının kendi kaydı mı?
-    if rental.user_id != user_id:
-        raise HTTPException(status_code=403, detail="You can only delete your own rentals")
-    
-    db.delete(rental)
-    db.commit()
-    
-    return {"message": "Rental deleted successfully"}
-
-# Kullanıcı güncelle
-def update_user(db: Session, user_id: int, updated_user: schemas.UserUpdate):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user:
-        user.username = updated_user.username
-        user.email = updated_user.email
-        if updated_user.password:
-            user.hashed_password = get_password_hash(updated_user.password)
-        db.commit()
-        db.refresh(user)
-        return user
-    return None
-
-# Kullanıcı sil
-def delete_user(db: Session, user_id: int):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if user:
-        db.delete(user)
-        db.commit()
-        return user
-    return None
-
-
+def get_user_joined_rides(db: Session, user_id: int):
+    return db.query(models.RideParticipant).filter(models.RideParticipant.user_id == user_id).all()
