@@ -4,18 +4,19 @@ from datetime import datetime
 from enum import Enum
 
 # ENUM for User Role
-
 class UserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
     passenger = "passenger"
     admin = "admin"
 
-class UserCreate(BaseModel):
-    username: str
-    email: str
-    password: str
-    role: UserRoleEnum 
+# Ortak Base Model (Tarih formatlamak için)
+class BaseOutModel(BaseModel):
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.strftime("%Y-%m-%d %H:%M")
+        }
 
 # USER SCHEMAS
 class UserBase(BaseModel):
@@ -31,13 +32,9 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
-class UserOut(UserBase):
+class UserOut(UserBase, BaseOutModel):
     id: int
     role: UserRoleEnum
-
-    class Config:
-        from_attributes = True
-        
 
 class Token(BaseModel):
     access_token: str
@@ -54,37 +51,29 @@ class VehicleBase(BaseModel):
 class VehicleCreate(VehicleBase):
     pass
 
-class VehicleOut(VehicleBase):
+class VehicleOut(VehicleBase, BaseOutModel):
     id: int
     owner_id: int
     available: bool
 
-    class Config:
-        from_attributes = True
-        
-
 # RENTAL SCHEMAS
 class RentalBase(BaseModel):
     vehicle_id: int
-    start_date: datetime
-    end_date: datetime
+    start_date: datetime = Field(..., example="2025-05-20 10:00")
+    end_date: datetime = Field(..., example="2025-05-22 18:30")
     total_price: Optional[int] = None  
 
 class RentalCreate(RentalBase):
     pass
 
-class RentalOut(RentalBase):
+class RentalOut(RentalBase, BaseOutModel):
     id: int
     user_id: int
 
-    class Config:
-        from_attributes = True
-        
-
 # RIDE SCHEMAS
 class RideBase(BaseModel):
-    start_date: datetime
-    end_date: datetime
+    start_date: datetime = Field(..., example="2025-06-01 09:00")
+    end_date: datetime = Field(..., example="2025-06-01 11:30")
     start_location: str
     end_location: str
     available_seats: int
@@ -92,14 +81,10 @@ class RideBase(BaseModel):
 class RideCreate(RideBase):
     rental_id: int
 
-class RideOut(RideBase):
+class RideOut(RideBase, BaseOutModel):
     id: int
     rental_id: int
     renter_id: int
-
-    class Config:
-        from_attributes = True
-        
 
 # RIDE PARTICIPANT SCHEMAS
 class RideParticipantBase(BaseModel):
@@ -109,10 +94,7 @@ class RideParticipantBase(BaseModel):
 class RideParticipantCreate(RideParticipantBase):
     pass
 
-class RideParticipantOut(RideParticipantBase):
+class RideParticipantOut(RideParticipantBase, BaseOutModel):
     id: int
     user_id: int
-
-    class Config:
-        from_attributes = True
-        
+    ride_id: int

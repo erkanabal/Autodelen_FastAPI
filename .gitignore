@@ -11,6 +11,9 @@ env/
 .env
 .env.*
 
+git check-ignore -v .env
+
+
 # SQLite database
 *.db
 *.sqlite3
