@@ -3,21 +3,14 @@ from app import models, schemas
 from fastapi import HTTPException, status
 from app.auth import get_password_hash
 from sqlalchemy import and_, or_
-from app.models import UserRoleEnum
+from app.models import UserRoleEnum  # Veritabanı enum'u
 import datetime
-
-
+from app.schemas import UserRoleEnum
 
 # ----------------------- USER -----------------------
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
-
-def get_user_by_username(db: Session, username: str):
-    return db.query(models.User).filter(models.User.username == username).first()
-
-def get_all_users(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.User).offset(skip).limit(limit).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
@@ -25,7 +18,7 @@ def create_user(db: Session, user: schemas.UserCreate):
         username=user.username,
         email=user.email,
         hashed_password=hashed_password,
-        role=user.role  # role opsiyonel, admin vs için
+        role=UserRoleEnum(user.role.value)  # 🎯 Dönüştürme yapılır
     )
     db.add(db_user)
     db.commit()
@@ -35,8 +28,8 @@ def create_user(db: Session, user: schemas.UserCreate):
 def update_user(db: Session, user_id: int, updated_user: schemas.UserUpdate):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user:
-        user.username = updated_user.username
-        user.email = updated_user.email
+        user.username = updated_user.username or user.username
+        user.email = updated_user.email or user.email
         if updated_user.password:
             user.hashed_password = get_password_hash(updated_user.password)
         db.commit()
@@ -51,7 +44,6 @@ def delete_user(db: Session, user_id: int):
         db.commit()
         return user
     return None
-
 # ----------------------- VEHICLES (OWNER) -----------------------
 
 def create_vehicle(db: Session, vehicle: schemas.VehicleCreate, user_id: int):

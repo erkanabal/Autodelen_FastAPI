@@ -3,53 +3,62 @@ from typing import Optional
 from datetime import datetime
 from enum import Enum
 
-# ENUM for User Role
+# ====================
+# ENUMS
+# ====================
 
+# 🎯 Swagger'da sadece owner, renter, passenger görünsün
+class PublicUserRoleEnum(str, Enum):
+    owner = "owner"
+    renter = "renter"
+    passenger = "passenger"
+
+# 🎯 Veritabanı için tam enum (admin dahil)
 class UserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
     passenger = "passenger"
     admin = "admin"
 
+# ====================
+# USER SCHEMAS
+# ====================
+
 class UserCreate(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     password: str
-    role: UserRoleEnum 
+    role: PublicUserRoleEnum  # admin bu enumda yok
 
-class ReviewType(str, Enum):
-    rental = "rental"
-    ride = "ride"
-    vehicle = "vehicle"
-    user = "user"
+    class Config:
+        use_enum_values = False  # Etiketler görünsün (Swagger)
 
-# USER SCHEMAS
-class UserBase(BaseModel):
+class UserOut(BaseModel):
+    id: int
     username: str
     email: EmailStr
-
-class UserCreate(UserBase):
-    password: str
     role: UserRoleEnum
+
+    class Config:
+        from_attributes = True  # Pydantic v2 desteği
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
-class UserOut(UserBase):
-    id: int
-    role: UserRoleEnum
-
-    class Config:
-        from_attributes = True
-        
+# ====================
+# TOKEN
+# ====================
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+# ====================
 # VEHICLE SCHEMAS
+# ====================
+
 class VehicleBase(BaseModel):
     brand: str
     model: str
@@ -67,9 +76,11 @@ class VehicleOut(VehicleBase):
 
     class Config:
         from_attributes = True
-        
 
+# ====================
 # RENTAL SCHEMAS
+# ====================
+
 class RentalBase(BaseModel):
     vehicle_id: int
     start_date: datetime
@@ -85,9 +96,11 @@ class RentalOut(RentalBase):
 
     class Config:
         from_attributes = True
-        
 
+# ====================
 # RIDE SCHEMAS
+# ====================
+
 class RideBase(BaseModel):
     start_date: datetime
     end_date: datetime
@@ -100,14 +113,21 @@ class RideCreate(RideBase):
 
 class RideOut(RideBase):
     id: int
+    start_location: str
+    end_location: str
+    start_date: datetime
+    end_date: datetime
+    available_seats: int
     rental_id: int
     renter_id: int
 
     class Config:
         from_attributes = True
-        
 
+# ====================
 # RIDE PARTICIPANT SCHEMAS
+# ====================
+
 class RideParticipantBase(BaseModel):
     ride_id: int
     passengers_count: int = Field(default=1, ge=1)
@@ -121,40 +141,36 @@ class RideParticipantOut(RideParticipantBase):
 
     class Config:
         from_attributes = True
-        
-from pydantic import BaseModel
 
-class ReviewBase(BaseModel):
-    rating: int
-    comment: str | None = None
+# ====================
+# REVIEW SCHEMAS
+# ====================
 
-class ReviewCreate(ReviewBase):
-    rental_id: int
-
-class ReviewOut(ReviewBase):
-    id: int
-    user_id: int
-    rental_id: int
-
-    class Config:
-        orm_mode = True
+class ReviewType(str, Enum):
+    rental = "rental"
+    ride = "ride"
+    vehicle = "vehicle"
+    user = "user"
 
 class ReviewBase(BaseModel):
     type: ReviewType
     rating: int = Field(..., ge=1, le=5)
-    comment: str | None = None
-
-    rental_id: int | None = None
-    ride_id: int | None = None
-    vehicle_id: int | None = None
-    target_user_id: int | None = None
+    comment: Optional[str] = None
+    rental_id: Optional[int] = None
+    ride_id: Optional[int] = None
+    vehicle_id: Optional[int] = None
+    target_user_id: Optional[int] = None
 
 class ReviewCreate(ReviewBase):
     pass
 
-class ReviewOut(ReviewBase):
+class ReviewOut(BaseModel):
     id: int
+    type: str
+    rating: int
+    comment: Optional[str]
     user_id: int
+    target_user_id: Optional[int]
 
     class Config:
-        orm_mode = True
+        from_attributes = True

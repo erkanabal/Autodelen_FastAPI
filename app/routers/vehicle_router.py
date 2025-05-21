@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app import crud, schemas, auth, models
 from app.database import get_db
+from typing import Optional, List
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
@@ -75,3 +76,31 @@ def delete_vehicle(vehicle_id: int, db: Session = Depends(get_db), current_user:
         return {"detail": "Vehicle deleted"}
 
     raise HTTPException(status_code=403, detail="Not authorized")
+
+@router.get("/search", response_model=list[schemas.VehicleOut], status_code=status.HTTP_200_OK)
+def search_vehicles(
+    brand: Optional[str] = None,
+    model: Optional[str] = None,
+    seats: Optional[int] = None,
+    luggage_min: Optional[int] = None,
+    available: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    query = db.query(models.Vehicle)
+
+    if brand:
+        query = query.filter(models.Vehicle.brand.ilike(f"%{brand}%"))
+    if model:
+        query = query.filter(models.Vehicle.model.ilike(f"%{model}%"))
+    if seats:
+        query = query.filter(models.Vehicle.seats >= seats)
+    if luggage_min:
+        query = query.filter(models.Vehicle.luggage >= luggage_min)
+    if available is not None:
+        query = query.filter(models.Vehicle.available == available)
+
+    return query.all()
+
+
+
