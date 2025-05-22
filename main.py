@@ -7,7 +7,8 @@ from app.auth import get_password_hash
 from app.models import UserRoleEnum  # ✅ enum burada kullanılır
 import os
 
-# Veritabanı tablolarını oluştur
+
+# Create all tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -17,6 +18,7 @@ app = FastAPI(
 )
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "default_admin_password")
+
 
 def create_admin_user():
     db = SessionLocal()
@@ -37,11 +39,13 @@ def create_admin_user():
         print("ℹ️ Admin user already exists.")
     db.close()
 
+
 @app.on_event("startup")
 def on_startup():
     create_admin_user()
 
 # Router'lar
+# Routers
 app.include_router(user_router.router)
 app.include_router(auth_router.router)
 app.include_router(vehicle_router.router)
@@ -53,3 +57,4 @@ app.include_router(review_router.router)
 @app.get("/")
 def read_root():
     return {"message": "API is up and running!"}
+

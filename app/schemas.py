@@ -7,48 +7,57 @@ from enum import Enum
 # ENUMS
 # ====================
 
-# 🎯 Swagger'da sadece owner, renter, passenger görünsün
 class PublicUserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
     passenger = "passenger"
 
-# 🎯 Veritabanı için tam enum (admin dahil)
 class UserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
     passenger = "passenger"
     admin = "admin"
 
+class ReviewType(str, Enum):
+    rental = "rental"
+    ride = "ride"
+    vehicle = "vehicle"
+    user = "user"
+
+# ====================
+# COMMON BASE
+# ====================
+
+class BaseOutModel(BaseModel):
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.strftime("%Y-%m-%d %H:%M")
+        }
+
 # ====================
 # USER SCHEMAS
 # ====================
 
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     username: str
     email: EmailStr
+
+class UserCreate(UserBase):
     password: str
-    role: PublicUserRoleEnum  # admin bu enumda yok
-
-    class Config:
-        use_enum_values = False  # Etiketler görünsün (Swagger)
-
-class UserOut(BaseModel):
-    id: int
-    username: str
-    email: EmailStr
-    role: UserRoleEnum
-
-    class Config:
-        from_attributes = True  # Pydantic v2 desteği
+    role: PublicUserRoleEnum
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
+class UserOut(UserBase, BaseOutModel):
+    id: int
+    role: UserRoleEnum
+
 # ====================
-# TOKEN
+# TOKEN SCHEMA
 # ====================
 
 class Token(BaseModel):
@@ -69,13 +78,17 @@ class VehicleBase(BaseModel):
 class VehicleCreate(VehicleBase):
     pass
 
-class VehicleOut(VehicleBase):
+class VehicleUpdate(BaseModel):
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    license_plate: Optional[str] = None
+    seats: Optional[int] = None
+    luggage: Optional[int] = None
+
+class VehicleOut(VehicleBase, BaseOutModel):
     id: int
     owner_id: int
     available: bool
-
-    class Config:
-        from_attributes = True
 
 # ====================
 # RENTAL SCHEMAS
@@ -83,46 +96,43 @@ class VehicleOut(VehicleBase):
 
 class RentalBase(BaseModel):
     vehicle_id: int
-    start_date: datetime
-    end_date: datetime
-    total_price: Optional[int] = None  
+    start_date: datetime = Field(..., example="2025-05-20 10:00")
+    end_date: datetime = Field(..., example="2025-05-22 18:30")
+    total_price: Optional[float] = None
 
 class RentalCreate(RentalBase):
     pass
 
-class RentalOut(RentalBase):
+class RentalUpdate(BaseModel):
+    vehicle_id: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+
+class RentalOut(RentalBase, BaseOutModel):
     id: int
     user_id: int
-
-    class Config:
-        from_attributes = True
 
 # ====================
 # RIDE SCHEMAS
 # ====================
 
 class RideBase(BaseModel):
-    start_date: datetime
-    end_date: datetime
+    start_date: datetime = Field(..., example="2025-06-01 09:00")
+    end_date: datetime = Field(..., example="2025-06-01 11:30")
     start_location: str
     end_location: str
     available_seats: int
 
 class RideCreate(RideBase):
     rental_id: int
+    vehicle_id: int
 
-class RideOut(RideBase):
+class RideOut(RideBase, BaseOutModel):
     id: int
-    start_location: str
-    end_location: str
-    start_date: datetime
-    end_date: datetime
-    available_seats: int
     rental_id: int
     renter_id: int
-
-    class Config:
-        from_attributes = True
+    vehicle_id: int
 
 # ====================
 # RIDE PARTICIPANT SCHEMAS
@@ -135,22 +145,13 @@ class RideParticipantBase(BaseModel):
 class RideParticipantCreate(RideParticipantBase):
     pass
 
-class RideParticipantOut(RideParticipantBase):
+class RideParticipantOut(RideParticipantBase, BaseOutModel):
     id: int
     user_id: int
-
-    class Config:
-        from_attributes = True
 
 # ====================
 # REVIEW SCHEMAS
 # ====================
-
-class ReviewType(str, Enum):
-    rental = "rental"
-    ride = "ride"
-    vehicle = "vehicle"
-    user = "user"
 
 class ReviewBase(BaseModel):
     type: ReviewType
@@ -164,13 +165,6 @@ class ReviewBase(BaseModel):
 class ReviewCreate(ReviewBase):
     pass
 
-class ReviewOut(BaseModel):
+class ReviewOut(ReviewBase, BaseOutModel):
     id: int
-    type: str
-    rating: int
-    comment: Optional[str]
     user_id: int
-    target_user_id: Optional[int]
-
-    class Config:
-        from_attributes = True
