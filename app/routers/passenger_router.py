@@ -10,21 +10,30 @@ def read_available_rides(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user) 
 ):
+    """
+    Retrieve all available rides for passengers.
+
+    Only users with the 'passenger' role can access this endpoint.
+    """
     if current_user.role != models.UserRoleEnum.passenger:
         raise HTTPException(status_code=403, detail="Only passengers can view rides")
     
     return crud.get_available_rides(db=db)
 
-@router.post("/rides/{ride_id}/join", status_code=status.HTTP_200_OK)
+@router.post("/rides/{ride_id}/join", status_code=status.HTTP_201_CREATED)
 def join_ride(
     ride_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user) 
 ):
+    """
+    Join a ride as a passenger.
+
+    Only users with the 'passenger' role can join rides.
+    """
     if current_user.role != models.UserRoleEnum.passenger:
         raise HTTPException(status_code=403, detail="Only passengers can join rides")
 
-   
     result = crud.join_ride(db=db, ride_id=ride_id, user_id=current_user.id)
 
     return {"detail": result["message"]}

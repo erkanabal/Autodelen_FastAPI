@@ -12,8 +12,17 @@ def create_rental(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    """
+    Create a new rental.
+
+    Only users with the 'renter' role can create rentals.
+    Checks if the vehicle is available for the specified date range.
+    """
     if current_user.role != models.UserRoleEnum.renter:
         raise HTTPException(status_code=403, detail="Only renters can create rentals")
+
+    if rental.start_date >= rental.end_date:
+        raise HTTPException(status_code=400, detail="start_date must be before end_date")
 
     is_available = crud.is_vehicle_available(
         db=db,
@@ -36,11 +45,17 @@ def read_rentals(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    """
+    Get rentals based on user role.
+
+    - Admin: returns all rentals.
+    - Owner: returns rentals of their vehicles.
+    - Renter: returns their own rentals.
+    """
     if current_user.role == models.UserRoleEnum.admin:
         return crud.get_all_rentals(db)
 
     elif current_user.role == models.UserRoleEnum.owner:
-        # Owner kendi araçlarına yapılan kiralamaları görür
         return crud.get_rentals_for_owner_vehicles(db, owner_id=current_user.id)
 
     elif current_user.role == models.UserRoleEnum.renter:
@@ -49,6 +64,7 @@ def read_rentals(
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+
 @router.put("/{rental_id}", response_model=schemas.RentalOut, status_code=status.HTTP_200_OK)
 def update_rental(
     rental_id: int,
@@ -56,36 +72,67 @@ def update_rental(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if current_user.role != models.UserRoleEnum.renter and current_user.role != models.UserRoleEnum.admin:
+    """
+    Update an existing rental.
+
+    Only renters and admins are authorized to update rentals.
+    """
+    if current_user.role not in [models.UserRoleEnum.renter, models.UserRoleEnum.admin]:
         raise HTTPException(status_code=403, detail="Not authorized to update rental")
 
     return crud.update_rental(db=db, rental_id=rental_id, updated_rental=updated_rental, user_id=current_user.id)
 
-@router.delete("/{rental_id}")
+
+@router.delete("/{rental_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_rental(
     rental_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if current_user.role != models.UserRoleEnum.renter and current_user.role != models.UserRoleEnum.admin:
+    """
+    Delete a rental by ID.
+
+    Only renters and admins are authorized to delete rentals.
+    """
+    if current_user.role not in [models.UserRoleEnum.renter, models.UserRoleEnum.admin]:
         raise HTTPException(status_code=403, detail="Not authorized to delete rental")
 
-    return crud.delete_rental(db=db, rental_id=rental_id, user_id=current_user.id)
+    deleted = crud.delete_rental(db=db, rental_id=rental_id, user_id=current_user.id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Rental not found or not authorized")
+
+    return {"detail": "Rental deleted successfully"}
+
 
 @router.get("/available", response_model=list[schemas.VehicleOut], status_code=status.HTTP_200_OK)
 def get_available_vehicles(
-    start_date: str = Query(..., example="2025-05-19 10:00", description="Format: YYYY-MM-DD HH:MM"),
-    end_date: str = Query(..., example="2025-05-20 10:00", description="Format: YYYY-MM-DD HH:MM"),
+    start_date: str = Query(
+        ...,
+        example="2025-05-19 10:00",
+        description="Start datetime for availability check. Format: YYYY-MM-DD HH:MM"
+    ),
+    end_date: str = Query(
+        ...,
+        example="2025-05-20 10:00",
+        description="End datetime for availability check. Format: YYYY-MM-DD HH:MM"
+    ),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    """
+    Get all vehicles available within the specified date and time range.
+
+    Only renters and admins can access this endpoint.
+    """
     try:
         start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Expected: YYYY-MM-DD HH:MM")
 
-    # Hem renter hem admin araçları uygunluk durumuna göre görebilir
+    if start_dt >= end_dt:
+        raise HTTPException(status_code=400, detail="start_date must be before end_date")
+
     if current_user.role not in [models.UserRoleEnum.renter, models.UserRoleEnum.admin]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
