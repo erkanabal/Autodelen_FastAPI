@@ -7,13 +7,11 @@ from enum import Enum
 # ENUMS
 # ====================
 
-# 🎯 Swagger'da sadece owner, renter, passenger görünsün
 class PublicUserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
     passenger = "passenger"
 
-# 🎯 Veritabanı için tam enum (admin dahil)
 class UserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
@@ -31,7 +29,7 @@ class UserCreate(BaseModel):
     role: PublicUserRoleEnum  # admin bu enumda yok
 
     class Config:
-        use_enum_values = False  # Etiketler görünsün (Swagger)
+        use_enum_values = False
 
 class UserOut(BaseModel):
     id: int
@@ -40,7 +38,7 @@ class UserOut(BaseModel):
     role: UserRoleEnum
 
     class Config:
-        from_attributes = True  # Pydantic v2 desteği
+        from_attributes = True
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
@@ -48,7 +46,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 # ====================
-# TOKEN
+# TOKEN SCHEMAS
 # ====================
 
 class Token(BaseModel):
@@ -85,7 +83,7 @@ class RentalBase(BaseModel):
     vehicle_id: int
     start_date: datetime
     end_date: datetime
-    total_price: Optional[int] = None  
+    total_price: Optional[float] = None  # float olmalı, int değil
 
 class RentalCreate(RentalBase):
     pass
@@ -113,11 +111,6 @@ class RideCreate(RideBase):
 
 class RideOut(RideBase):
     id: int
-    start_location: str
-    end_location: str
-    start_date: datetime
-    end_date: datetime
-    available_seats: int
     rental_id: int
     renter_id: int
 
@@ -147,30 +140,29 @@ class RideParticipantOut(RideParticipantBase):
 # ====================
 
 class ReviewType(str, Enum):
-    rental = "rental"
-    ride = "ride"
     vehicle = "vehicle"
-    user = "user"
+    ride = "ride"
+    renter = "renter"
 
 class ReviewBase(BaseModel):
     type: ReviewType
-    rating: int = Field(..., ge=1, le=5)
+    rating: int = Field(..., ge=0, le=10)
+    rating_category: str
     comment: Optional[str] = None
-    rental_id: Optional[int] = None
-    ride_id: Optional[int] = None
     vehicle_id: Optional[int] = None
-    target_user_id: Optional[int] = None
+    ride_id: Optional[int] = None
+    renter_id: Optional[int] = None
 
 class ReviewCreate(ReviewBase):
     pass
 
-class ReviewOut(BaseModel):
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(None, ge=0, le=10)
+    comment: Optional[str] = None
+
+class ReviewOut(ReviewBase):
     id: int
-    type: str
-    rating: int
-    comment: Optional[str]
     user_id: int
-    target_user_id: Optional[int]
 
     class Config:
         from_attributes = True

@@ -3,9 +3,10 @@ from app import models, schemas
 from fastapi import HTTPException, status
 from app.auth import get_password_hash
 from sqlalchemy import and_, or_
-from app.models import UserRoleEnum  # Veritabanı enum'u
+from app.models import UserRoleEnum 
 import datetime
-from app.schemas import UserRoleEnum
+from app.schemas import UserRoleEnum, ReviewType
+from typing import Optional, List
 
 # ----------------------- USER -----------------------
 
@@ -216,27 +217,90 @@ def check_passenger_time_conflict(db: Session, user_id: int, start_date, end_dat
 def get_user_joined_rides(db: Session, user_id: int):
     return db.query(models.RideParticipant).filter(models.RideParticipant.user_id == user_id).all()
 
+# ----------------------- REVIEW -----------------------
 
-def create_review(db: Session, review: schemas.ReviewCreate, user_id: int):
-    db_review = models.Review(**review.dict(), user_id=user_id)
+def create_review(db: Session, review: schemas.ReviewCreate, user: models.User) -> models.Review:
+    # Yeni review objesi oluşturuluyor
+    db_review = models.Review(
+        type=review.type,
+        rating=review.rating,
+        comment=review.comment,
+        user_id=user.id,  # Yorumu yapan kullanıcının ID'si
+        vehicle_id=review.vehicle_id,
+        ride_id=review.ride_id,
+        renter_id=review.renter_id,
+        rating_category=determine_rating_category(review.rating),  # Aşağıda helper fonksiyon var
+    )
     db.add(db_review)
     db.commit()
     db.refresh(db_review)
     return db_review
 
 
-def get_reviews_by_rental(db: Session, rental_id: int):
-    return db.query(models.Review).filter(models.Review.rental_id == rental_id).all()
+def search_reviews(
+    db: Session,
+    vehicle_id: Optional[int] = None,
+    ride_id: Optional[int] = None,
+    renter_id: Optional[int] = None,
+    review_type: Optional[schemas.ReviewType] = None,
+) -> List[models.Review]:
+    query = db.query(models.Review)
+
+    if vehicle_id is not None:
+        query = query.filter(models.Review.vehicle_id == vehicle_id)
+
+    if ride_id is not None:
+        query = query.filter(models.Review.ride_id == ride_id)
+
+    if renter_id is not None:
+        query = query.filter(models.Review.renter_id == renter_id)
+
+    if review_type is not None:
+        query = query.filter(models.Review.type == review_type)
+
+    return query.all()
 
 
-def get_reviews_by_type_and_target(db: Session, review_type: schemas.ReviewType, target_id: int):
-    model = models.Review
-    match review_type:
-        case schemas.ReviewType.rental:
-            return db.query(model).filter(model.type == review_type, model.rental_id == target_id).all()
-        case schemas.ReviewType.ride:
-            return db.query(model).filter(model.type == review_type, model.ride_id == target_id).all()
-        case schemas.ReviewType.vehicle:
-            return db.query(model).filter(model.type == review_type, model.vehicle_id == target_id).all()
-        case schemas.ReviewType.user:
-            return db.query(model).filter(model.type == review_type, model.target_user_id == target_id).all()
+def determine_rating_category(rating: int) -> str:
+    # Rating değerine göre kategori belirleyen basit örnek
+    if rating >= 9:
+        return "Perfect"
+    elif rating >= 7:
+        return "Very Good"
+    elif rating >= 5:
+        return "Good"
+    elif rating >= 3:
+        return "Fair"
+    else:
+        return "Poor"
+
+
+
+
+def update_review(db: Session, review_id: int, review_update: schemas.ReviewUpdate, user: models.User):
+    db_review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not db_review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if db_review.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this review")
+
+    for key, value in review_update.dict(exclude_unset=True).items():
+        setattr(db_review, key, value)
+    # Güncelleme sonrası kategori güncellenebilir:
+    if "rating" in review_update.dict(exclude_unset=True):
+        db_review.rating_category = categorize_rating(db_review.rating)
+
+    db.commit()
+    db.refresh(db_review)
+    return db_review
+
+
+def delete_review(db: Session, review_id: int, user: models.User):
+    db_review = db.query(models.Review).filter(models.Review.id == review_id).first()
+    if not db_review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if db_review.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this review")
+    db.delete(db_review)
+    db.commit()
+    return {"detail": "Review deleted"}

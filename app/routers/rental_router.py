@@ -44,7 +44,7 @@ def read_rentals(
         return crud.get_rentals_for_owner_vehicles(db, owner_id=current_user.id)
 
     elif current_user.role == models.UserRoleEnum.renter:
-        return crud.get_user_rentals(db=db, user_id=current_user.id)
+        return crud.get_all_rentals(db=db, user_id=current_user.id)
 
     else:
         raise HTTPException(status_code=403, detail="Not authorized")

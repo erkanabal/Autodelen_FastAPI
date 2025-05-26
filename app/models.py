@@ -4,12 +4,12 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
-
 class UserRoleEnum(str, Enum):
     owner = "owner"
     renter = "renter"
     passenger = "passenger"
-    admin = "admin" 
+    admin = "admin"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -27,10 +27,8 @@ class User(Base):
 
     # 🔧 Yapan kullanıcı
     reviews = relationship("Review", back_populates="user", foreign_keys="Review.user_id")
-
-    # 🔧 Bu kullanıcıya yapılan yorumlar (örneğin user-to-user)
-    received_reviews = relationship("Review", back_populates="target_user", foreign_keys="Review.target_user_id")
-
+  
+    received_reviews = relationship("Review", back_populates="renter", foreign_keys="Review.renter_id")
 
 
 class Vehicle(Base):
@@ -45,6 +43,8 @@ class Vehicle(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="vehicles")
+    reviews = relationship("Review", back_populates="vehicle")
+
 
 class Rental(Base):
     __tablename__ = "rentals"
@@ -54,30 +54,30 @@ class Rental(Base):
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
     total_price = Column(Float)
-    
 
     vehicle = relationship("Vehicle")
     user = relationship("User", back_populates="rentals")
     rides = relationship("Ride", back_populates="rental")
 
-    reviews = relationship("Review", back_populates="rental")
+    reviews = relationship("Review", back_populates="rental")  # <-- Buraya dikkat
 
 
 class Ride(Base):
     __tablename__ = "rides"
     id = Column(Integer, primary_key=True, index=True)
     rental_id = Column(Integer, ForeignKey("rentals.id"))
-    renter_id = Column(Integer, ForeignKey("users.id")) 
+    renter_id = Column(Integer, ForeignKey("users.id"))
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
-    start_location = Column(String, nullable=False) 
+    start_location = Column(String, nullable=False)
     end_location = Column(String, nullable=False)
     available_seats = Column(Integer, nullable=False)
 
     rental = relationship("Rental", back_populates="rides")
     renter = relationship("User", back_populates="rides_created")
     participants = relationship("RideParticipant", back_populates="ride")
-    
+    reviews = relationship("Review", back_populates="ride")
+
 
 class RideParticipant(Base):
     __tablename__ = "ride_participants"
@@ -89,29 +89,33 @@ class RideParticipant(Base):
     user = relationship("User", back_populates="ride_participations")
     ride = relationship("Ride", back_populates="participants")
 
+
 class ReviewType(str, Enum):
-    rental = "rental"
-    ride = "ride"
     vehicle = "vehicle"
-    user = "user"
+    ride = "ride"
+    renter = "renter"  # user yerine renter olarak yorum tipi
+
 
 class Review(Base):
     __tablename__ = "reviews"
 
     id = Column(Integer, primary_key=True, index=True)
     type = Column(SQLEnum(ReviewType), nullable=False)
-    rating = Column(Integer, nullable=False)
+    rating = Column(Integer, nullable=False)  # 0-10 arası puanlama
+    rating_category = Column(String, nullable=False)  # kategori: Perfect, Very Good vb.
     comment = Column(Text, nullable=True)
 
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # yorumu yapan kişi
 
-    rental_id = Column(Integer, ForeignKey("rentals.id"), nullable=True)
-    ride_id = Column(Integer, ForeignKey("rides.id"), nullable=True)
+    # Yorum yapılan nesneye göre foreign key
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=True)
-    target_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    ride_id = Column(Integer, ForeignKey("rides.id"), nullable=True)
+    renter_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # renter için yorum owner yapar
+    rental_id = Column(Integer, ForeignKey("rentals.id"), nullable=True)  # <-- Burası eklendi
 
-    user = relationship("User", foreign_keys=[user_id])
-    rental = relationship("Rental")
-    ride = relationship("Ride")
-    vehicle = relationship("Vehicle")
-    target_user = relationship("User", foreign_keys=[target_user_id])
+    # İlişkiler
+    vehicle = relationship("Vehicle", back_populates="reviews")
+    ride = relationship("Ride", back_populates="reviews")
+    user = relationship("User", back_populates="reviews", foreign_keys=[user_id])
+    renter = relationship("User", back_populates="received_reviews", foreign_keys=[renter_id])
+    rental = relationship("Rental", back_populates="reviews")  # <-- Burası eklendi
