@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app import crud, schemas, models, auth
 from app.database import get_db
+from typing import Optional, List
+from datetime import date, time
+from sqlalchemy import Date, Time
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
 
@@ -48,7 +51,7 @@ def update_ride(ride_id: int, updated_ride: schemas.RideCreate, db: Session = De
         raise HTTPException(status_code=404, detail="Ride not found or not authorized")
     return updated
 
-@router.delete("/{ride_id}, status_code=status.HTTP_204_NO_CONTENT")
+@router.delete("/{ride_id}")
 def delete_ride(ride_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     if current_user.role != models.UserRoleEnum.renter and current_user.role != models.UserRoleEnum.admin:
         raise HTTPException(status_code=403, detail="Not authorized to delete ride")
@@ -56,9 +59,6 @@ def delete_ride(ride_id: int, db: Session = Depends(get_db), current_user: model
     if not deleted:
         raise HTTPException(status_code=404, detail="Ride not found or not authorized")
     return {"detail": "Ride deleted successfully"}
-
-from typing import Optional, List
-from datetime import date, time, datetime
 
 @router.get("/search", response_model=List[schemas.RideOut])
 def search_rides(

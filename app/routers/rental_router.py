@@ -61,7 +61,7 @@ def update_rental(
 
     return crud.update_rental(db=db, rental_id=rental_id, updated_rental=updated_rental, user_id=current_user.id)
 
-@router.delete("/{rental_id}, status_code=status.HTTP_204_NO_CONTENT")
+@router.delete("/{rental_id}")
 def delete_rental(
     rental_id: int,
     db: Session = Depends(get_db),

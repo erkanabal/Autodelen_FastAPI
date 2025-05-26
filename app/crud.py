@@ -44,6 +44,9 @@ def delete_user(db: Session, user_id: int):
         db.commit()
         return user
     return None
+
+def get_all_users(db: Session):
+    return db.query(models.User).all()
 # ----------------------- VEHICLES (OWNER) -----------------------
 
 def create_vehicle(db: Session, vehicle: schemas.VehicleCreate, user_id: int):
@@ -221,15 +224,9 @@ def create_review(db: Session, review: schemas.ReviewCreate, user_id: int):
     db.refresh(db_review)
     return db_review
 
+
 def get_reviews_by_rental(db: Session, rental_id: int):
     return db.query(models.Review).filter(models.Review.rental_id == rental_id).all()
-
-def create_review(db: Session, review: schemas.ReviewCreate, user_id: int):
-    db_review = models.Review(**review.dict(), user_id=user_id)
-    db.add(db_review)
-    db.commit()
-    db.refresh(db_review)
-    return db_review
 
 
 def get_reviews_by_type_and_target(db: Session, review_type: schemas.ReviewType, target_id: int):

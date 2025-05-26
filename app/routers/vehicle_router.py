@@ -61,7 +61,7 @@ def update_vehicle(vehicle_id: int, vehicle: schemas.VehicleCreate, db: Session 
 
     raise HTTPException(status_code=403, detail="Not authorized")
 
-@router.delete("/{vehicle_id}, status_code=status.HTTP_204_NO_CONTENT")
+@router.delete("/{vehicle_id}")
 def delete_vehicle(vehicle_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
     if current_user.role == models.UserRoleEnum.admin:
         deleted = crud.delete_vehicle(db=db, vehicle_id=vehicle_id, user_id=None)
