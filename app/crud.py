@@ -156,7 +156,36 @@ def is_vehicle_available(db: Session, vehicle_id: int, start_date: datetime.date
     ).first()
     return overlapping_rentals is None
 
+def get_rentals_for_owner_vehicles(db: Session, owner_id: int):
+    return (
+        db.query(models.Rental)
+        .join(models.Vehicle)
+        .filter(models.Vehicle.owner_id == owner_id)
+        .all()
+    )
+
+def get_available_vehicles_by_date_range(db: Session, start_date: datetime.datetime, end_date: datetime.datetime):
+    vehicles = db.query(models.Vehicle).filter(models.Vehicle.available == True).all()
+    available_vehicles = []
+
+    for vehicle in vehicles:
+        overlapping_rental = db.query(models.Rental).filter(
+            models.Rental.vehicle_id == vehicle.id,
+            or_(
+                and_(models.Rental.start_date <= start_date, models.Rental.end_date > start_date),
+                and_(models.Rental.start_date < end_date, models.Rental.end_date >= end_date),
+                and_(models.Rental.start_date >= start_date, models.Rental.end_date <= end_date)
+            )
+        ).first()
+
+        if not overlapping_rental:
+            available_vehicles.append(vehicle)
+
+    return available_vehicles  # ✅ Always return a list, even if it's empty
+
 # ----------------------- RIDE (RENTER) -----------------------
+def get_ride(db: Session, ride_id: int):
+    return db.query(models.Ride).filter(models.Ride.id == ride_id).first()
 
 def create_ride(db: Session, ride: schemas.RideCreate, user_id: int):
     db_ride = models.Ride(

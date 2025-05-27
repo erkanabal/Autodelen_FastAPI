@@ -103,7 +103,6 @@ def delete_rental(
 
     return {"detail": "Rental deleted successfully"}
 
-
 @router.get("/available", response_model=list[schemas.VehicleOut], status_code=status.HTTP_200_OK)
 def get_available_vehicles(
     start_date: str = Query(
@@ -136,4 +135,6 @@ def get_available_vehicles(
     if current_user.role not in [models.UserRoleEnum.renter, models.UserRoleEnum.admin]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    return crud.get_all_available_vehicles(db=db)
+    # ✅ This part must NOT be inside the `if` block!
+    result = crud.get_available_vehicles_by_date_range(db=db, start_date=start_dt, end_date=end_dt)
+    return result or []  # fallback to empty list if None is returned

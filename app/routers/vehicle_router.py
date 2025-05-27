@@ -50,7 +50,7 @@ def read_vehicles(
     if current_user.role == models.UserRoleEnum.admin:
         return crud.get_all_vehicles(db)
     elif current_user.role == models.UserRoleEnum.owner:
-        return crud.get_user_vehicles(db=db, user_id=current_user.id)
+        return crud.get_all_vehicles(db=db)
     elif current_user.role in [models.UserRoleEnum.renter, models.UserRoleEnum.passenger]:
         return crud.get_all_available_vehicles(db=db)
     else:

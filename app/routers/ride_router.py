@@ -52,7 +52,7 @@ def read_rides(
     elif current_user.role in [models.UserRoleEnum.passenger, models.UserRoleEnum.admin]:
         return crud.get_available_rides(db)
     elif current_user.role == models.UserRoleEnum.renter:
-        return crud.get_user_rides(db=db, user_id=current_user.id)
+        return crud.get_all_rides(db=db, user_id=current_user.id)
     else:
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -117,9 +117,7 @@ def delete_ride(
 def search_rides(
     start_location: Optional[str] = None,
     end_location: Optional[str] = None,
-    date_filter: Optional[date] = None,
-    time_min: Optional[time] = None,
-    time_max: Optional[time] = None,
+    # date_filter: Optional[date] = None,
     min_seats: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
@@ -139,10 +137,10 @@ def search_rides(
         query = query.filter(models.Ride.start_location.ilike(f"%{start_location}%"))
     if end_location:
         query = query.filter(models.Ride.end_location.ilike(f"%{end_location}%"))
-    if date_filter:
-        query = query.filter(models.Ride.start_date.cast(Date) == date_filter)
-    if time_min and time_max:
-        query = query.filter(models.Ride.start_date.cast(Time).between(time_min, time_max))
+    # if date_filter:
+    #     query = query.filter(models.Ride.start_date.cast(Date) == date_filter)
+    # if time_min and time_max:
+    #     query = query.filter(models.Ride.start_date.cast(Time).between(time_min, time_max))
     if min_seats:
         query = query.filter(models.Ride.available_seats >= min_seats)
 
