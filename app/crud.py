@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from app import models, schemas
 from app.auth import get_password_hash
-from app.schemas import UserRoleEnum, ReviewType
+from app.schemas import UserRoleEnum
 
 # User CRUD operations
 def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
@@ -173,27 +173,47 @@ def get_available_vehicles_by_date_range(
 
 # Ride CRUD operations
 def create_ride(db: Session, ride: schemas.RideCreate, user_id: int) -> models.Ride:
-    rental = db.query(models.Rental).filter(
-        models.Rental.user_id == user_id,
-        models.Rental.start_date <= ride.start_date,
-        models.Rental.end_date >= ride.end_date
-    ).first()
-    
+
+    rental = db.query(models.Rental).filter(models.Rental.id == ride.rental_id).first()
+
     if not rental:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rental not found"
+        )
+
+
+    # Normalize datetimes by removing timezone info to avoid TZ issues
+    ride_start = ride.start_date.replace(tzinfo=None)
+    ride_end = ride.end_date.replace(tzinfo=None)
+    rental_start = rental.start_date.replace(tzinfo=None)
+    rental_end = rental.end_date.replace(tzinfo=None)
+
+
+    # Check if the ride dates are within the rental dates
+    if not (rental_start <= ride_start and rental_end >= ride_end):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No valid rental found for the specified dates"
         )
-    
+
+    if rental.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User does not own this rental"
+        )
+
     db_ride = models.Ride(
         **ride.dict(),
-        rental_id=rental.id,
         renter_id=user_id
     )
     db.add(db_ride)
     db.commit()
     db.refresh(db_ride)
+
     return db_ride
+
+
 
 def get_ride(db: Session, ride_id: int) -> Optional[models.Ride]:
     return db.query(models.Ride).filter(models.Ride.id == ride_id).first()
@@ -268,8 +288,9 @@ def get_user_joined_rides(db: Session, user_id: int) -> List[models.RideParticip
 
 # Review CRUD operations
 def create_review(db: Session, review: schemas.ReviewCreate, user_id: int) -> models.Review:
+    review_data = review.dict(exclude={"rating_category"})  # rating_category inputta yok ama ek güvenlik
     db_review = models.Review(
-        **review.dict(),
+        **review_data,
         user_id=user_id,
         rating_category=categorize_rating(review.rating)
     )
@@ -286,7 +307,7 @@ def search_reviews(
     vehicle_id: Optional[int] = None,
     ride_id: Optional[int] = None,
     renter_id: Optional[int] = None,
-    review_type: Optional[ReviewType] = None
+    review_type: Optional[models.ReviewType] = None
 ) -> List[models.Review]:
     query = db.query(models.Review)
     
@@ -311,11 +332,12 @@ def update_review(
     if not db_review or db_review.user_id != user_id:
         return None
     
-    for key, value in review_update.dict(exclude_unset=True).items():
+    update_data = review_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(db_review, key, value)
     
-    if 'rating' in review_update.dict(exclude_unset=True):
-        db_review.rating_category = categorize_rating(review_update.rating)
+    if 'rating' in update_data:
+        db_review.rating_category = categorize_rating(update_data['rating'])
     
     db.commit()
     db.refresh(db_review)

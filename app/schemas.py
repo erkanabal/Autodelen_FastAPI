@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional
 from datetime import datetime, timezone
 from enum import Enum
+from app import models
 
 def ensure_aware_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
@@ -98,7 +99,7 @@ class RideBase(BaseModel):
     _normalize_end_date = validator("end_date", allow_reuse=True)(parse_and_ensure_utc)
 
 class RideCreate(RideBase):
-    pass
+    rental_id: int
 
 class RideOut(RideBase):
     id: int
@@ -132,15 +133,15 @@ class RideParticipantOut(RideParticipantBase):
     class Config:
         from_attributes = True
 
+
 class ReviewType(str, Enum):
     vehicle = "vehicle"
     ride = "ride"
     renter = "renter"
-
+    
 class ReviewBase(BaseModel):
-    type: ReviewType
+    type: models.ReviewType
     rating: int = Field(..., ge=0, le=10)
-    rating_category: str
     comment: Optional[str] = Field(None, max_length=500)
     vehicle_id: Optional[int] = None
     ride_id: Optional[int] = None
@@ -153,9 +154,11 @@ class ReviewUpdate(BaseModel):
     rating: Optional[int] = Field(None, ge=0, le=10)
     comment: Optional[str] = Field(None, max_length=500)
 
+
 class ReviewOut(ReviewBase):
     id: int
     user_id: int
+    rating_category: str  # sadece outputta tut
 
     class Config:
         from_attributes = True
