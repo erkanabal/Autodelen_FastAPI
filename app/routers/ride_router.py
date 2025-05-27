@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from app import crud, schemas, models, auth
+from app import schemas, crud, models, auth
 from app.database import get_db
-from typing import Optional, List
-from datetime import date, time
-from sqlalchemy import Date, Time
+from typing import List, Optional
+from datetime import datetime
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
 
@@ -14,74 +13,86 @@ def create_ride(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    return crud.create_ride(db=db, ride=ride, user_id=current_user.id)
+    if current_user.role != models.UserRoleEnum.renter:
+        raise HTTPException(status_code=403, detail="Only renters can create rides")
+    
+    try:
+        return crud.create_ride(db, ride, current_user.id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=list[schemas.RideOut], status_code=status.HTTP_200_OK)
-def read_rides(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role == models.UserRoleEnum.admin:
-        return crud.get_all_rides(db)
-    elif current_user.role in [models.UserRoleEnum.passenger, models.UserRoleEnum.admin]:
-        return crud.get_available_rides(db)
-    elif current_user.role == models.UserRoleEnum.renter:
-        return crud.get_user_rides(db=db, user_id=current_user.id)
-    else:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-@router.get("/{ride_id}", response_model=schemas.RideOut, status_code=status.HTTP_200_OK)
-def read_ride(ride_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    ride = crud.get_ride(db=db, ride_id=ride_id)
-    if not ride:
-        raise HTTPException(status_code=404, detail="Ride not found")
-
-    if current_user.role == models.UserRoleEnum.admin:
-        return ride
-    if current_user.role == models.UserRoleEnum.renter and ride.renter_id == current_user.id:
-        return ride
-    if current_user.role == models.UserRoleEnum.passenger:
-        return ride
-
-    raise HTTPException(status_code=403, detail="Not authorized")
-
-@router.put("/{ride_id}", response_model=schemas.RideOut, status_code=status.HTTP_200_OK)
-def update_ride(ride_id: int, updated_ride: schemas.RideCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role != models.UserRoleEnum.renter and current_user.role != models.UserRoleEnum.admin:
-        raise HTTPException(status_code=403, detail="Not authorized to update ride")
-    updated = crud.update_ride(db=db, ride_id=ride_id, updated_ride=updated_ride, user_id=current_user.id)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Ride not found or not authorized")
-    return updated
-
-@router.delete("/{ride_id}")
-def delete_ride(ride_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role != models.UserRoleEnum.renter and current_user.role != models.UserRoleEnum.admin:
-        raise HTTPException(status_code=403, detail="Not authorized to delete ride")
-    deleted = crud.delete_ride(db=db, ride_id=ride_id, user_id=current_user.id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Ride not found or not authorized")
-    return {"detail": "Ride deleted successfully"}
-
-@router.get("/search", response_model=List[schemas.RideOut])
-def search_rides(
-    start_location: Optional[str] = None,
-    end_location: Optional[str] = None,
-    date_filter: Optional[date] = None,
-    time_min: Optional[time] = None,
-    time_max: Optional[time] = None,
-    min_seats: Optional[int] = None,
+@router.get("/", response_model=List[schemas.RideOut])
+def read_rides(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    query = db.query(models.Ride)
+    if current_user.role == models.UserRoleEnum.admin:
+        return crud.get_all_rides(db)
+    elif current_user.role == models.UserRoleEnum.renter:
+        return [r for r in crud.get_all_rides(db) if r.renter_id == current_user.id]
+    else:
+        return crud.get_available_rides(db)
 
+@router.get("/{ride_id}", response_model=schemas.RideOut)
+def read_ride(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    ride = crud.get_ride(db, ride_id=ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    
+    if (current_user.role == models.UserRoleEnum.renter and ride.renter_id != current_user.id and 
+        current_user.role != models.UserRoleEnum.admin):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return ride
+
+@router.put("/{ride_id}", response_model=schemas.RideOut)
+def update_ride(
+    ride_id: int,
+    ride_update: schemas.RideUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if current_user.role not in [models.UserRoleEnum.renter, models.UserRoleEnum.admin]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    ride = crud.update_ride(db, ride_id, ride_update)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    return ride
+
+@router.delete("/{ride_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_ride(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if current_user.role not in [models.UserRoleEnum.renter, models.UserRoleEnum.admin]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    if not crud.delete_ride(db, ride_id):
+        raise HTTPException(status_code=404, detail="Ride not found")
+    return None
+
+@router.get("/search/available", response_model=List[schemas.RideOut])
+def search_available_rides(
+    start_location: Optional[str] = Query(None),
+    end_location: Optional[str] = Query(None),
+    min_seats: Optional[int] = Query(None, ge=1),
+    db: Session = Depends(get_db)
+):
+    rides = crud.get_available_rides(db)
+    
     if start_location:
-        query = query.filter(models.Ride.start_location.ilike(f"%{start_location}%"))
+        rides = [r for r in rides if start_location.lower() in r.start_location.lower()]
     if end_location:
-        query = query.filter(models.Ride.end_location.ilike(f"%{end_location}%"))
-    if date_filter:
-        query = query.filter(models.Ride.start_date.cast(Date) == date_filter)
-    if time_min and time_max:
-        query = query.filter(models.Ride.start_date.cast(Time).between(time_min, time_max))
+        rides = [r for r in rides if end_location.lower() in r.end_location.lower()]
     if min_seats:
-        query = query.filter(models.Ride.available_seats >= min_seats)
-
-    return query.all()
+        rides = [r for r in rides if r.available_seats >= min_seats]
+    
+    return rides

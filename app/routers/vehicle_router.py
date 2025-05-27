@@ -1,106 +1,97 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from app import crud, schemas, auth, models
+from app import schemas, crud, models, auth
 from app.database import get_db
-from typing import Optional, List
+from typing import List, Optional
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
 @router.post("/", response_model=schemas.VehicleOut, status_code=status.HTTP_201_CREATED)
-def create_vehicle(vehicle: schemas.VehicleCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+def create_vehicle(
+    vehicle: schemas.VehicleCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     if current_user.role != models.UserRoleEnum.owner:
-        raise HTTPException(status_code=403, detail="Only owners can add vehicles")
-    return crud.create_vehicle(db=db, vehicle=vehicle, user_id=current_user.id)
+        raise HTTPException(status_code=403, detail="Only owners can create vehicles")
+    return crud.create_vehicle(db=db, vehicle=vehicle, owner_id=current_user.id)
 
-@router.get("/", response_model=list[schemas.VehicleOut], status_code=status.HTTP_200_OK)
+@router.get("/", response_model=List[schemas.VehicleOut])
 def read_vehicles(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
     if current_user.role == models.UserRoleEnum.admin:
-        # Admin tüm araçları görür
         return crud.get_all_vehicles(db)
     elif current_user.role == models.UserRoleEnum.owner:
-        # Owner sadece kendi araçlarını görür
-        return crud.get_user_vehicles(db=db, user_id=current_user.id)
-    elif current_user.role in [models.UserRoleEnum.renter, models.UserRoleEnum.passenger]:
-        # Kiracı ve yolcu sadece uygun araçları görür
-        return crud.get_all_available_vehicles(db=db)
+        return [v for v in crud.get_all_vehicles(db) if v.owner_id == current_user.id]
     else:
-        raise HTTPException(status_code=403, detail="Not authorized")
+        return crud.get_all_available_vehicles(db)
 
-@router.get("/{vehicle_id}", response_model=schemas.VehicleOut, status_code=status.HTTP_200_OK)
-def read_vehicle(vehicle_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    vehicle = crud.get_vehicle(db=db, vehicle_id=vehicle_id)
-    if not vehicle:
-        raise HTTPException(status_code=404, detail="Vehicle not found")
-
-    if current_user.role == models.UserRoleEnum.admin:
-        return vehicle
-    if current_user.role == models.UserRoleEnum.owner and vehicle.owner_id == current_user.id:
-        return vehicle
-    if current_user.role in [models.UserRoleEnum.renter, models.UserRoleEnum.passenger]:
-        # kiracı veya yolcu araçları görebilir
-        return vehicle
-
-    raise HTTPException(status_code=403, detail="Not authorized")
-
-@router.put("/{vehicle_id}", response_model=schemas.VehicleOut, status_code=status.HTTP_200_OK)
-def update_vehicle(vehicle_id: int, vehicle: schemas.VehicleCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role == models.UserRoleEnum.admin:
-        updated = crud.update_vehicle(db=db, vehicle_id=vehicle_id, updated_vehicle=vehicle, user_id=None)
-        if not updated:
-            raise HTTPException(status_code=404, detail="Vehicle not found")
-        return updated
-
-    if current_user.role == models.UserRoleEnum.owner:
-        updated = crud.update_vehicle(db=db, vehicle_id=vehicle_id, updated_vehicle=vehicle, user_id=current_user.id)
-        if not updated:
-            raise HTTPException(status_code=403, detail="Not authorized or vehicle not found")
-        return updated
-
-    raise HTTPException(status_code=403, detail="Not authorized")
-
-@router.delete("/{vehicle_id}")
-def delete_vehicle(vehicle_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if current_user.role == models.UserRoleEnum.admin:
-        deleted = crud.delete_vehicle(db=db, vehicle_id=vehicle_id, user_id=None)
-        if not deleted:
-            raise HTTPException(status_code=404, detail="Vehicle not found")
-        return {"detail": "Vehicle deleted"}
-
-    if current_user.role == models.UserRoleEnum.owner:
-        deleted = crud.delete_vehicle(db=db, vehicle_id=vehicle_id, user_id=current_user.id)
-        if not deleted:
-            raise HTTPException(status_code=403, detail="Not authorized or vehicle not found")
-        return {"detail": "Vehicle deleted"}
-
-    raise HTTPException(status_code=403, detail="Not authorized")
-
-@router.get("/search", response_model=list[schemas.VehicleOut], status_code=status.HTTP_200_OK)
-def search_vehicles(
-    brand: Optional[str] = None,
-    model: Optional[str] = None,
-    seats: Optional[int] = None,
-    luggage_min: Optional[int] = None,
-    available: Optional[bool] = None,
+@router.get("/{vehicle_id}", response_model=schemas.VehicleOut)
+def read_vehicle(
+    vehicle_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    query = db.query(models.Vehicle)
+    vehicle = crud.get_vehicle(db, vehicle_id=vehicle_id)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    if (current_user.role == models.UserRoleEnum.owner and vehicle.owner_id != current_user.id and 
+        current_user.role != models.UserRoleEnum.admin):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    return vehicle
 
+@router.put("/{vehicle_id}", response_model=schemas.VehicleOut)
+def update_vehicle(
+    vehicle_id: int,
+    vehicle: schemas.VehicleCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if current_user.role == models.UserRoleEnum.admin:
+        updated_vehicle = crud.update_vehicle(db, vehicle_id, vehicle, None)
+    else:
+        updated_vehicle = crud.update_vehicle(db, vehicle_id, vehicle, current_user.id)
+    
+    if not updated_vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found or not authorized")
+    return updated_vehicle
+
+@router.delete("/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_vehicle(
+    vehicle_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if current_user.role == models.UserRoleEnum.admin:
+        success = crud.delete_vehicle(db, vehicle_id, None)
+    else:
+        success = crud.delete_vehicle(db, vehicle_id, current_user.id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Vehicle not found or not authorized")
+    return None
+
+@router.get("/search/available", response_model=List[schemas.VehicleOut])
+def search_available_vehicles(
+    brand: Optional[str] = Query(None),
+    model: Optional[str] = Query(None),
+    min_seats: Optional[int] = Query(None, ge=1),
+    min_luggage: Optional[int] = Query(None, ge=0),
+    db: Session = Depends(get_db)
+):
+    vehicles = crud.get_all_available_vehicles(db)
+    
     if brand:
-        query = query.filter(models.Vehicle.brand.ilike(f"%{brand}%"))
+        vehicles = [v for v in vehicles if brand.lower() in v.brand.lower()]
     if model:
-        query = query.filter(models.Vehicle.model.ilike(f"%{model}%"))
-    if seats:
-        query = query.filter(models.Vehicle.seats >= seats)
-    if luggage_min:
-        query = query.filter(models.Vehicle.luggage >= luggage_min)
-    if available is not None:
-        query = query.filter(models.Vehicle.available == available)
-
-    return query.all()
-
-
-
+        vehicles = [v for v in vehicles if model.lower() in v.model.lower()]
+    if min_seats:
+        vehicles = [v for v in vehicles if v.seats >= min_seats]
+    if min_luggage:
+        vehicles = [v for v in vehicles if v.luggage and v.luggage >= min_luggage]
+    
+    return vehicles

@@ -2,16 +2,24 @@ from fastapi import FastAPI
 from sqlalchemy.orm import Session
 from app import models, crud, schemas
 from app.database import engine, SessionLocal
-from app.routers import user_router, vehicle_router, rental_router, ride_router, passenger_router, auth_router, review_router
+from app.routers import (
+    user_router, 
+    vehicle_router, 
+    rental_router, 
+    ride_router, 
+    passenger_router, 
+    auth_router, 
+    review_router
+)
 from app.auth import get_password_hash
-from app.models import UserRoleEnum  # ✅ enum burada kullanılır
+from app.models import UserRoleEnum
 import os
 
-# Veritabanı tablolarını oluştur
+# Create database tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Car Rental API",
+    title="Car Sharing API",
     version="1.0.0",
     description="API for managing users, vehicles, rentals, rides, and passengers."
 )
@@ -41,7 +49,7 @@ def create_admin_user():
 def on_startup():
     create_admin_user()
 
-# Router'lar
+# Include routers
 app.include_router(user_router.router)
 app.include_router(auth_router.router)
 app.include_router(vehicle_router.router)
