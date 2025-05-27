@@ -57,38 +57,6 @@ def read_vehicles(
         raise HTTPException(status_code=403, detail="Not authorized")
 
 
-@router.get(
-    "/{vehicle_id}",
-    response_model=schemas.VehicleOut,
-    status_code=status.HTTP_200_OK,
-    summary="Get vehicle by ID",
-    description="Get detailed information about a vehicle if authorized."
-)
-def read_vehicle(
-    vehicle_id: int, 
-    db: Session = Depends(get_db), 
-    current_user: models.User = Depends(auth.get_current_user)
-):
-    """
-    Retrieve a specific vehicle by its ID.
-
-    - Admins can retrieve any vehicle.
-    - Owners can retrieve only their vehicles.
-    - Renters and passengers can retrieve vehicles.
-    """
-    vehicle = crud.get_vehicle(db=db, vehicle_id=vehicle_id)
-    if not vehicle:
-        raise HTTPException(status_code=404, detail="Vehicle not found")
-
-    if current_user.role == models.UserRoleEnum.admin:
-        return vehicle
-    if current_user.role == models.UserRoleEnum.owner and vehicle.owner_id == current_user.id:
-        return vehicle
-    if current_user.role in [models.UserRoleEnum.renter, models.UserRoleEnum.passenger]:
-        return vehicle
-
-    raise HTTPException(status_code=403, detail="Not authorized")
-
 
 @router.put(
     "/{vehicle_id}",
@@ -188,3 +156,36 @@ def search_vehicles(
         query = query.filter(models.Vehicle.available == available)
 
     return query.all()
+
+@router.get(
+    "/{vehicle_id}",
+    response_model=schemas.VehicleOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get vehicle by ID",
+    description="Get detailed information about a vehicle if authorized."
+)
+def read_vehicle(
+    vehicle_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Retrieve a specific vehicle by its ID.
+
+    - Admins can retrieve any vehicle.
+    - Owners can retrieve only their vehicles.
+    - Renters and passengers can retrieve vehicles.
+    """
+    vehicle = crud.get_vehicle(db=db, vehicle_id=vehicle_id)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    if current_user.role == models.UserRoleEnum.admin:
+        return vehicle
+    if current_user.role == models.UserRoleEnum.owner and vehicle.owner_id == current_user.id:
+        return vehicle
+    if current_user.role in [models.UserRoleEnum.renter, models.UserRoleEnum.passenger]:
+        return vehicle
+
+    raise HTTPException(status_code=403, detail="Not authorized")
+

@@ -57,39 +57,6 @@ def read_rides(
         raise HTTPException(status_code=403, detail="Not authorized")
 
 
-@router.get(
-    "/{ride_id}",
-    response_model=schemas.RideOut,
-    status_code=status.HTTP_200_OK,
-    summary="Get ride by ID",
-    description="Get details of a ride by its ID. Access restricted based on user roles."
-)
-def read_ride(
-    ride_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
-):
-    """
-    Retrieve a ride by ID.
-
-    - Admin can view all rides.
-    - Renters can view rides they own.
-    - Passengers can view rides.
-    """
-    ride = crud.get_ride(db=db, ride_id=ride_id)
-    if not ride:
-        raise HTTPException(status_code=404, detail="Ride not found")
-
-    if current_user.role == models.UserRoleEnum.admin:
-        return ride
-    if current_user.role == models.UserRoleEnum.renter and ride.renter_id == current_user.id:
-        return ride
-    if current_user.role == models.UserRoleEnum.passenger:
-        return ride
-
-    raise HTTPException(status_code=403, detail="Not authorized")
-
-
 @router.put(
     "/{ride_id}",
     response_model=schemas.RideOut,
@@ -180,3 +147,37 @@ def search_rides(
         query = query.filter(models.Ride.available_seats >= min_seats)
 
     return query.all()
+
+
+@router.get(
+    "/{ride_id}",
+    response_model=schemas.RideOut,
+    status_code=status.HTTP_200_OK,
+    summary="Get ride by ID",
+    description="Get details of a ride by its ID. Access restricted based on user roles."
+)
+def read_ride(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Retrieve a ride by ID.
+
+    - Admin can view all rides.
+    - Renters can view rides they own.
+    - Passengers can view rides.
+    """
+    ride = crud.get_ride(db=db, ride_id=ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found")
+
+    if current_user.role == models.UserRoleEnum.admin:
+        return ride
+    if current_user.role == models.UserRoleEnum.renter and ride.renter_id == current_user.id:
+        return ride
+    if current_user.role == models.UserRoleEnum.passenger:
+        return ride
+
+    raise HTTPException(status_code=403, detail="Not authorized")
+
